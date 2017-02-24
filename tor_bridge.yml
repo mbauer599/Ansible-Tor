@@ -1,0 +1,61 @@
+---
+- hosts: tor_bridge
+  tasks:
+    - name: installs tor relay
+      apt: pkg=tor state=installed update_cache=true
+      notify:
+      - start tor
+
+    - name: installs obfs4proxy
+      apt: pkg=obfs4proxy state=installed update_cache=true
+
+    - name: Configure the ORPort
+      lineinfile: dest=/etc/tor/torrc regexp='^ORPort' insertafter='^#ORPort' line='ORPort 443'
+      notify:
+        - restart tor
+
+    - name: Configure the DirPort
+      lineinfile: dest=/etc/tor/torrc regexp='^DirPort' insertafter='^#DirPort' line='DirPort 80'
+      notify:
+        - restart tor
+
+    - name: Configure the exitpolicy to auto allow
+      lineinfile: dest=/etc/tor/torrc regexp='^ExtORPort' insertafter='^#ExtORPort' line='ExtORPort auto'
+      notify:
+        - restart tor
+
+    - name: Configure the relay name
+      lineinfile: dest=/etc/tor/torrc regexp='^Nickname' insertafter='^#Nickname' line='Nickname {{ ansible_nodename }}'
+      notify:
+        - restart tor
+
+    - name: Configure RunAsDaemon
+      lineinfile: dest=/etc/tor/torrc regexp='^RunAsDaemon' insertafter='^#RunAsDaemon' line='RunAsDaemon 1'
+      notify:
+        - restart tor
+
+    - name: Configure BridgeRelay
+      lineinfile: dest=/etc/tor/torrc regexp='^BridgeRelay' insertafter='^#BridgeRelay' line='BridgeRelay 1'
+      notify:
+        - restart tor
+
+    - name: Configure contact info. Empty by default
+      lineinfile: dest=/etc/tor/torrc regexp='^ContactInfo' insertafter='^#ContactInfo' line='ContactInfo'
+      notify:
+        - restart tor
+
+    - name: Configure proxy application
+      lineinfile: dest=/etc/tor/torrc regexp='^ServerTransportPlugin' insertafter='^#ServerTransportPlugin' line='ServerTransportPlugin obfs4 exec /user/bin/obfs4proxy'
+      notify:
+        - restart tor
+
+    - name: Add a weekly restart job to cron
+      lineinfile: dest=/etc/crontab regexp='^@midnight       root    apt-get update && apt-get upgrade -y'
+                  line='@midnight       root    apt-get update && apt-get upgrade -y'
+
+  handlers:
+    - name: start tor
+      service: name=tor state=started
+
+    - name: restart tor
+      service: name=tor state=restarted

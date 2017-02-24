@@ -1,0 +1,43 @@
+---
+- hosts: tor_relay
+  tasks:
+    - name: installs tor relay
+      apt: pkg=tor state=installed update_cache=true
+      notify:
+        - start tor
+
+    - name: Configure the ORPort
+      lineinfile: dest=/etc/tor/torrc regexp='^ORPort' insertafter='^#ORPort' line='ORPort 443'
+      notify:
+        - restart tor
+
+    - name: Configure the DirPort
+      lineinfile: dest=/etc/tor/torrc regexp='^DirPort' insertafter='^#DirPort' line='DirPort 80'
+      notify:
+        - restart tor
+
+    - name: Configure the exitpolicy to reject all
+      lineinfile: dest=/etc/tor/torrc regexp='^Exitpolicy' insertafter='^#Exitpolicy' line='Exitpolicy reject {{ "*:*" }}'
+      notify:
+        - restart tor
+
+    - name: Configure the relay name
+      lineinfile: dest=/etc/tor/torrc regexp='^Nickname' insertafter='^#Nickname' line='Nickname {{ ansible_nodename }}'
+      notify:
+        - restart tor
+
+    - name: Configure contact info. Empty by default
+      lineinfile: dest=/etc/tor/torrc regexp='^ContactInfo' insertafter='^#ContactInfo' line='ContactInfo'
+      notify:
+        - restart tor
+
+    - name: Add a weekly restart job to cron
+      lineinfile: dest=/etc/crontab regexp='^@midnight       root    apt-get update && apt-get upgrade -y'
+                  line='@midnight       root    apt-get update && apt-get upgrade -y'
+
+  handlers:
+    - name: start tor
+      service: name=tor state=started
+
+    - name: restart tor
+      service: name=tor state=restarted
